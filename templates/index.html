@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Code Optimizer</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="top-bar">
+    <div class="logo">LOGO</div>
+    <div class="project-name">AI Code Optimizer</div>
+    <div class="top-right">
+      <label>
+        Language
+        <select id="language-select">
+          <option value="cpp">C++</option>
+          <option value="python">Python</option>
+        </select>
+      </label>
+      <label>
+        Goal
+        <select id="goal-select">
+          <option value="readability">Readability</option>
+          <option value="performance">Performance</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+    <main class="main-grid">
+    <section class="code-pane left">
+      <h2>User code</h2>
+      <textarea id="user-code" spellcheck="false">#include &lt;iostream&gt;
+
+using namespace std;
+
+int main() {
+    int a = 3;
+    int b = 2;
+    char c = 'a';
+    string s = "hello";
+    a++;
+    cout &lt;&lt; "a = " &lt;&lt; a;
+    return 0;
+}</textarea>
+
+      <h2 style="margin-top: 12px;">Task description (optional)</h2>
+      <textarea id="task-context" placeholder="Describe the problem, constraints, input/output format..." spellcheck="false"></textarea>
+    </section>
+
+
+    <section class="center-pane">
+      <button id="optimize-btn">▶</button>
+    </section>
+
+    <section class="code-pane right">
+  <div class="code-pane-header">
+    <h2>AI code</h2>
+    <button id="copy-ai-btn" type="button">Copy</button>
+  </div>
+  <textarea id="ai-code" readonly spellcheck="false"></textarea>
+</section>
+  </main>
+
+  <section class="diff-pane">
+    <h2>Combed code with highlights</h2>
+    <div id="diff-view"></div>
+  </section>
+
+  <section class="comments-pane">
+    <h2>Comments about code</h2>
+    <ul id="comments-list"></ul>
+  </section>
+
+  <script>
+  const btn = document.getElementById("optimize-btn");
+  const copyBtn = document.getElementById("copy-ai-btn");
+  const errorBanner = document.getElementById("error-banner");
+
+  function showError(msg) {
+    errorBanner.textContent = msg;
+    errorBanner.style.display = "block";
+    setTimeout(() => {
+      errorBanner.style.display = "none";
+    }, 3000);
+  }
+
+  btn.addEventListener("click", async () => {
+    const code = document.getElementById("user-code").value.trim();
+    const language = document.getElementById("language-select").value;
+    const goal = document.getElementById("goal-select").value;
+    const context = document.getElementById("task-context")?.value || "";
+
+    if (!code) {
+      showError("Введите код для оптимизации.");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "…";
+
+    try {
+      const resp = await fetch("/api/optimize", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ code, language, goal, context })
+      });
+
+      if (!resp.ok) {
+        showError("Ошибка сервера при оптимизации кода.");
+        return;
+      }
+
+      const data = await resp.json();
+
+      document.getElementById("ai-code").value = data.optimized_code || "";
+
+      const diffView = document.getElementById("diff-view");
+      diffView.innerHTML = data.annotated_code || "";
+
+      const commentsList = document.getElementById("comments-list");
+      commentsList.innerHTML = "";
+      (data.comments || []).forEach(text => {
+        const li = document.createElement("li");
+        li.textContent = text;
+        commentsList.appendChild(li);
+      });
+
+    } catch (e) {
+      showError("Не удалось отправить запрос. Проверьте подключение.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "▶";
+    }
+  });
+
+  copyBtn.addEventListener("click", async () => {
+    const aiCode = document.getElementById("ai-code").value;
+    if (!aiCode.trim()) {
+      showError("Нет кода для копирования.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(aiCode);
+      showError("AI-код скопирован в буфер обмена.");
+    } catch (e) {
+      showError("Не удалось скопировать в буфер обмена.");
+    }
+  });
+</script>
+
+<div id="error-banner" class="error-banner" style="display:none;"></div>
+
+</body>
+</html>
